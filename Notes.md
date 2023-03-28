@@ -81,4 +81,78 @@ __Sensor Setup__
 43. Login 
 44. Run a ip a command to determine if eno1 IP is right 
 45. ssh into the sensor via student laptop
-    - ssh admin@172.16.50.100
+    - ssh admin@172.16.50.100  
+46. Run 'sudo vi /etc/sysconfig/network-scripts/ifcfg-eno1'
+47. Change all the IPv6 to "no" and ONBOOT to "yes"
+48. wq! to save 
+49. Enter sudo vi /etc/sysctl.conf
+50. Type "net.ipv6.conf.all.disable_ipv6=1"
+51. Type "net.ipv6.conf.default.disable_ipv6=1"
+52. wq! to save 
+53. Run 'sudo vi /etc/hosts'
+54. Ignore the line ::1
+55. sudo sysctl -p to restart  
+---  
+
+# Repository
+---
+
+- cd /etc/yum.repos.d
+- ls -l
+- sudo rm -rf CentOS-*
+- Open up a browser and go to 192.168.2.20
+- Go to share folder 
+- sudo curl -LO http://192.168.2.20:8080/local.repo  
+- sudo yum makecache  
+- sudo yum list zeek
+- sudo yum update / Y 
+- sudo systemctl reboot
+- sudo yum makecache --disablerepo="**" --enablerepo=local*
+- sudo yum update --disablerepo="**" --enablerepo=local*
+- sudo systemctl reboot  
+---  
+
+# SELinux  
+---
+
+Check status of SELinux: sestatus  
+
+---  
+# Sniffing Traffic  
+---  
+
+1. ip a
+2. enp5s0 is used for sniffing traffic
+3. sudo ethtool -k enp5s0 
+4. sudo curl -LO http://192.168.2.20:8080/interface_prep.sh
+5. ls -l
+6. cat interface_prep.sh
+7. sudo chmod +x interface_prep.sh
+8. sudo ./interface_prep.sh enp5s0
+9. sudo ethtool -k enp5s0 
+10. cd /sbin
+11. sudo curl -LO http://192.168.2.20:8080/ifup-local  
+12. sudo chmod +x ifup-local
+13. cd /etc/sysconfig/network-scripts/
+14. sudo vi ifup and at the bottom add
+    - if [ -x /sbin/ifup-local ]; then  
+    /sbin/ifup-local ${DEVICE}  
+    fi
+15. Enter :wq
+16. sudo vi ifcfg-enp5s0
+17. BOOTPROTO = none, IPv6 = no, DEFROUTE = None, ONBOOT = yes, NM_CONTROLLED = no 
+18. :wq to save
+19. sudo systemctl reboot 
+20. ssh admin@172.16.50.100
+21. sudo ethtool -k enp5s0
+22. keep checksum off
+23. ip a 
+24. enp5s0 should be promsc.
+25. once the tap is in place ssh into the sensor
+26. cd /etc/yum.repos.d 
+27. sudo yum install tcpdump --disablerepo=* --enablerepo=local*
+28. sudo yum list tcpdump
+29. tcpdump -i enp5s0
+30. tcpdump -nn -i enp5s0
+31. sudo tcpdump -nn -c5 -i enp5s0 '!port 22'
+32. 

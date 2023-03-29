@@ -67,7 +67,7 @@ __Sensor Setup__
 29. Add another /tmp 1 G
 30. Add another /var 1G
 31. /data/stenographer500G//suricata25G//fsf10G//zeek25G//elasticsearch//kafka100G
-32. /var/log/audit, /var/temp
+32. /var/log/audit, /var/tmp
 33. Highlight / and the click create new volume group 
 34. Highlight the 500GB disk then rename it to vg_os
 35. Click Update Settings
@@ -154,5 +154,69 @@ Check status of SELinux: sestatus
 28. sudo yum list tcpdump
 29. tcpdump -i enp5s0
 30. tcpdump -nn -i enp5s0
-31. sudo tcpdump -nn -c5 -i enp5s0 '!port 22'
-32. 
+31. sudo tcpdump -nn -c5 -i enp5s0 '!port 22'  
+---  
+# DAY 3  
+---  
+__Google Stenographer__
+
+- Fast write speed, slow read speed.
+- Written in GO
+1. sudo yum list stenographer 
+2. sudo yum install stenographer / hit y
+3. cd /etc/stenographer
+4. ls -l
+5. sudo vi config
+6. In the "Packets Directory" write "/data/stenographer/packets"
+    In the "Index Directory" "/data/stenographer/index"
+    interface = "enp5s0"
+    stenotypepath = "/bin/stenotype"
+7. :wq!
+8. sudo mkdir /data/stenographer/packets 
+9. sudo mkdir /data/stenographer/index
+10. cd /data/stenographer
+11. pwd
+12. ls -l
+13. sudo chown -R stenographer:stenographer /data/stenographer
+14. sudo stenokeys.sh stenographer stenographer
+15. cd /etc/stenographer/cert
+16. sudo systemctl start stenographer 
+17. sudo systemctl status stenographer 
+18. sudo systemctl enable stenographer 
+19. ^enable^status
+20. __sudo journalctl -xeu stenographer__
+21. ping 192.168.2.20
+22. sudo stenoread 'host 192.168.2.20' -nn 'src host 192.168.2.20' 
+23. cd /data/stenographer
+24. watch ls -al  
+---  
+# Suricata  
+---  
+- sudo yum install suricata / y
+- sudo -s 
+- cd /etc/suricata
+- vi suricata.yaml
+    - :set nu
+    - Line 56: /data/suricata 
+    - Line 60: enabled: no 
+    - Line 76: enabled: no
+    - Line 404: enabled: no
+    - Line 557: enabled: no 
+    - Line 580: interface: enp5s0
+    - Line 582: uncomment threads: auto
+- :wq
+- cd /etc/sysconfig/
+- sudo vi /etc/sysconfig/suricata  
+    - OPTIONS="--af-packet=enp5s0 --user suricata "
+- :wq
+- sudo suricata-update add-source local-emerging-threats https://192.168.2.20:8080/emerging.rules.tar
+- sudo suricata-update 
+- cd /data/
+- sudo chown -R suricata: /data/suricata
+- ls -l
+- sudo systemctl start suricata
+- ^start^enable
+- ^enable^status
+- curl -LO 192.168.2.20:8080/all-class-files.zip  
+- cd /data/suricata
+- cat eve.json | jq

@@ -380,4 +380,36 @@ __FSF__
     - WantedBy=multi-user.target
 14. :wq
 15. sudo systemctl start fsf
-16. ^start^status
+16. ^start^status 
+17. cd 
+18. touch test
+19. vi test 
+20. /opt/fsf/fsf-client/fsf_client.py --full test
+21. sudo mkdir /data/zeek/extracted_files
+22. sudo chown -R zeek: /data/zeek/extracted_files
+23. sudo chmod 0755 /data/zeek/extracted_files
+24. sudo vi /usr/share/zeek/site/scripts/extract_files.zeek
+    - @load /usr/share/zeek/policy/frameworks/files/extract-all-files.zeek
+    - redef FileExtract::prefix = "/data/zeek/extracted_files/";
+    - redef FileExtract::default_limit = 1048576000; 
+25. :wq
+26. sudo vi /usr/share/zeek/site/local.zeek
+    - at the bottom add @load ./scripts/extract_files.zeek
+27. sudo systemctl restart zeek
+28. ^restart^status
+29. sudo curl -LO https://192.168.2.20:8080/putty.exe
+30. ls -l /data/zeek/extracted_files/
+31. cd /data/zeek/extracted_files/
+32. sudo file extract-
+33. sudo /usr/share/zeek/site/scripts/fsf.zeek
+34. cd /usr/share/zeek/site/scripts/
+35. sudo curl -LO http://192.168.2.20:8080/zeek_scripts/fsf.zeek
+36. sudo vi fsf.zeek 
+    - Line10: local file_path = "/data/zeek/extracted_files/";
+37. sudo vi /usr/share/zeek/site/local.zeek
+    - @load ./scripts/fsf.zeek
+38. sudo systemctl restart zeek
+39. ^restart^status
+40. sudo curl -LO http://192.168.2.20:8080/putty.exe
+41. cat /data/fsf/logs/rockout.log | wc -l
+

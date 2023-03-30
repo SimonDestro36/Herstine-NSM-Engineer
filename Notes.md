@@ -209,7 +209,7 @@ __Google Stenographer__
 - sudo vi /etc/sysconfig/suricata  
     - OPTIONS="--af-packet=enp5s0 --user suricata "
 - :wq
-- sudo suricata-update add-source local-emerging-threats https://192.168.2.20:8080/emerging.rules.tar
+- sudo suricata-update add-source local-emerging-threats http://192.168.2.20:8080/emerging.rules.tar
 - sudo suricata-update 
 - cd /data/
 - sudo chown -R suricata: /data/suricata
@@ -219,4 +219,165 @@ __Google Stenographer__
 - ^enable^status
 - curl -LO 192.168.2.20:8080/all-class-files.zip  
 - cd /data/suricata
-- cat eve.json | jq
+- cat eve.json | jq  
+---  
+# DAY 4  
+---  
+__ZEEK__  
+
+---
+
+- /usr/bin - binaries
+- /etc/zeek - configs
+- /var/log - data
+- /usr/share/zeek  
+
+1. sudo yum install zeek zeek-plugin-kafka zeek-plugin-af_packet
+2. cd /etc/zeek
+3. sudo vi /etc/zeek/networks.cfg  -- no changes needed
+4. sudo vi /etc/zeek/zeekctl.cfg
+    - :set nu
+    - Line 67: /data/zeek
+    - Bottom line add: lb_custom.InterfacePrefix=af_packet::
+5. :wq
+6. sudo vi /etc/zeek/node.cfg  
+    - :set nu
+    - Lines 8-11: Comment out
+    - Lines 16-18: Uncomment 
+    - Line 23: add in pin_cpus=1
+    - Lines 25-32: uncomment 
+    - Line 32: Interface=enp5s0
+    - Add Line at 33: lb_method=custom
+    - Add Line at 34: lb_procs=2 
+    - Add Line at 35: pin_cpus=2, 3
+    - Add line at 36: env_vars=fanout_id=77
+7. :wq
+8. sudo mkdir /usr/share/zeek/site/scripts
+9. cd /usr/share/zeek/site/scripts
+10. pwd
+11. sudo curl -LO http://192.168.2.20:8080/zeek_scripts/afpacket.zeek
+12. sudo vi /usr/share/zeek/site/scripts/afpacket.zeek
+13. sudo curl -LO http://192.168.2.20:8080/zeek_scripts/extension.zeek
+14. sudo vi /extension.zeek
+15. sudo vi /usr/share/zeek/site/local.zeek
+    - Shift G
+    - Add Line at bottom: @load ./scritpts/afpacket.zeek
+    - Add Line: @load ./scripts/extension.zeek
+16. :wq
+17. cd /data
+18. ls -l
+19. sudo chown -R zeek: /etc/zeek
+20. sudo chown -R zeek: /data/zeek
+21. sudo chown -R zeek: /usr/share/zeek
+22. sudo chown -R zeek: /usr/bin/capstats
+23. sudo chown -R zeek: /var/spool/zeek
+24. sudo /sbin/setcap cap_net_raw,cap_net_admin=eip /usr/bin/zeek
+25. sudo /sbin/setcap cap_net_raw,cap_net_admin=eip /usr/bin/capstats
+26. sudo getcap /usr/bin/zeek
+27. sudo getcap /usr/bin/capstats
+28. sudo vi /etc/systemd/system/zeek.service
+    - [Unit]
+    - Description=Zeek Network Analysis Engine
+    - After=network.target
+
+    - [Service]
+    - Type=forking
+    - User=zeek
+    - ExecStart=/usr/bin/zeekctl deploy
+    - ExecStop=/usr/bin/zeekctl stop
+
+    - [Install]
+    - WantedBy=multi-user.target
+29. :wq
+30. sudo cd /usr/share/zeek/site/scripts
+31. sudo vi /usr/share/zeek/site/local.zeek
+32. sudo systmctl deamon-reload
+33. sudo systemctl start zeek
+34. ls -l /data/zeek/current/
+35. sudo systemctl enable zeek
+
+
+---
+__KAFKA__
+
+---
+
+1. sudo yum install kafka zookeeper 
+2. sudo vi /etc/zookeeper/zoo.cfg
+    - No changes
+3. sudo systemctl start zookeeper
+4. ^start^status
+5. ^status^enable
+6. sudo vi /etc/kafka/server.properties
+    - :set nu
+    - Line 31: uncomment and add PLAINTEXT://172.16.50.100:9092
+    - Line 36: uncomment and add PLAINTEXT://172.16.50.100:9092
+    - Line 60: /data/kafka
+    - Line 65: num.partitions=3
+    - Line 107: log.retention.bytes=90000000000
+    - Line 123: zookeeper.connect=127.0.0.1:2181
+7. :wq
+8. sudo chown -R kafka: /data/kafka
+9. sudo firewall-cmd --add-port=9092/tcp --permanent
+10. sudo firewall-cmd --add-port=2181/tcp --permanent
+11. sudo firewall-cmd --reload
+12. ^start^status
+13. ^status^enable
+14. sudo cd /usr/share/zeek/site/scripts
+15. pwd
+16. curl -LO http://192.168.2.20:8080/zeek_scripts/kafka.zeek
+17. sudo vi kafka.zeek
+    - Line 7: "172.16.50.100:9092"
+18. :wq
+19. cd ..
+20. sudo vi local.zeek
+21. shift G
+22. at the bottom add @load ./scripts/kafka.zeek
+23. sudo /usr/share/kafka/bin/kafka-topics.sh --bootstrap-server 172.16.50.100:9092 --list
+24. sudo /usr/share/kafka/bin/kafka-console-consumer.sh --bootstrap-server 172.16.50.100:9092 --topic zeek-raw 
+---  
+__FSF__  
+
+---
+
+1. sudo yum install fsf
+2. sudo vi /opt/fsf/fsf-server/conf/config.py
+    - Line 9: LOG_PATH : '/data/fsf/logs',
+    - Line 10: YARA_PATH : '/var/lib/yara-rules/rules.yara',
+    - Line 11: PID_PATH : '/run/fsf/fsf.pid',
+    - Line 12: EXPORT_PATH : '/data/fsf/archive',
+    - Line 18: IP_ADDRESS : "localhost",
+3. :wq
+4. cd /data
+5. cd /fsf
+6. sudo mkdir -p /data/fsf/{logs,archive}
+7. ll
+8. sudo chown -R fsf: /data/fsf
+9. sudo chmod -R 755 /data/fsf
+10. cd ..
+11. ll
+12. sudo vi /opt/fsf/fsf-client/conf/config.py
+    - No changes
+13. sudo vi /etc/systemd/system/fsf.service
+    - [UNit]
+    - Description=File Scanning Framework (FSF-Server) Service
+    - After=network.target
+
+    - [Service]
+    - Type=forking
+    - User=fsf
+    - Group=fsf
+    - WorkingDirectory=/
+    - PIDFile=/run/fsf/fsf.pid
+    - PermissionsStartOnly=true
+    - ExecStartPre=/bin/mkdir -p /run/fsf
+    - ExecStartPre-/bin/chown -R fsf:fsf /run/fsf
+    - ExecStart=/opt/fsf/fsf-server/main.py start
+    - ExecStop=/opt/fsf/fsf-server/main.py stop
+    - ExecReload=/opt/fsf/fsf-server/main.py restart
+
+    - [Install]
+    - WantedBy=multi-user.target
+14. :wq
+15. sudo systemctl start fsf
+16. ^start^status

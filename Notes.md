@@ -242,8 +242,8 @@ __ZEEK__
 5. :wq
 6. sudo vi /etc/zeek/node.cfg  
     - :set nu
-    - Lines 8-11: Comment out
-    - Lines 16-18: Uncomment 
+    - Lines 8-11: Comment out -not doing a standalone
+    - Lines 16-18: Uncomment -for load balancing
     - Line 23: add in pin_cpus=1
     - Lines 25-32: uncomment 
     - Line 32: Interface=enp5s0
@@ -321,6 +321,7 @@ __KAFKA__
 9. sudo firewall-cmd --add-port=9092/tcp --permanent
 10. sudo firewall-cmd --add-port=2181/tcp --permanent
 11. sudo firewall-cmd --reload
+12. sudo systemctl start kafka
 12. ^start^status
 13. ^status^enable
 14. sudo cd /usr/share/zeek/site/scripts
@@ -346,7 +347,7 @@ __FSF__
     - Line 10: YARA_PATH : '/var/lib/yara-rules/rules.yara',
     - Line 11: PID_PATH : '/run/fsf/fsf.pid',
     - Line 12: EXPORT_PATH : '/data/fsf/archive',
-    - Line 18: IP_ADDRESS : "localhost",
+    - Line 18: IP_ADDRESS : "172.16.50.100",
 3. :wq
 4. cd /data
 5. cd /fsf
@@ -357,9 +358,9 @@ __FSF__
 10. cd ..
 11. ll
 12. sudo vi /opt/fsf/fsf-client/conf/config.py
-    - No changes
+    - Line 9: '172.16.50.100'
 13. sudo vi /etc/systemd/system/fsf.service
-    - [UNit]
+    - [Unit]
     - Description=File Scanning Framework (FSF-Server) Service
     - After=network.target
 
@@ -411,5 +412,159 @@ __FSF__
 38. sudo systemctl restart zeek
 39. ^restart^status
 40. sudo curl -LO http://192.168.2.20:8080/putty.exe
-41. cat /data/fsf/logs/rockout.log | wc -l
+41. cat /data/fsf/logs/rockout.log | wc -l  
+---  
+
+# Day 5  
+
+--- 
+__Rebuild Day__
+
+
+
+---
+# DAY 6  
+---  
+
+__Elasticsearch__
+
+- Node: single instance 
+- Cluster: One or more nodes 
+- Roles: Purpose that a node serves
+- Document: Basic Unit of info that can be indexed
+- Index: Logical namespace that refers to a collection of docs
+- Shard: Individual piece of an index
+
+1. ssh admin@172.16.50.100
+2. sudo yum install elasticsearch / y
+    - Uninstall: sudo yum remove elasticsearch
+    - sudo yum install elasticsearch-7.8.1
+3. sudo chown elasticsearch: /data/elasticsearch
+4. cd /data/
+    -verify everything should be its own owner 
+5. sudo vi /etc/elasticsearch/elasticsearch.yml
+    - :set nu
+    - Line 17: Uncomment: cluster.name: sg50-cluster
+    - Line 23: Uncomment: node.name: sg50-node
+    - Line 33: Uncomment: /data/elasticsearch
+    - Line 43: Uncomment
+    - Line 55: Uncomment: network.host: _eno1_
+    - Line 59: Uncomment: leave port at 9200
+    - Line 68: create new line and add discovery.type: single.node
+        - Line 68: [172.16.50.100]
+        - Line 72: [172.16.50.100]
+6. :wq
+7. sudo mkdir -p /usr/lib/systemd/system/elasticsearch.service.d
+8. sudo vi /usr/lib/systemd/system/elasticsearch.service.d/override.conf
+    - [Service]
+    - LimitMEMLOCK=infinity
+9. :wq
+10. sudo chmod 755 /usr/lib/systemd/system/elastic.service.d
+11. sudo chmod 644 /usr/lib/systemd/system/elastic.service.d/override.conf
+12. sudo systemctl daemon-reload
+13. sudo systemctl start elasticsearch
+14. ^start^status
+15. cd /etc/suricata
+16. sudo systemctl enable elasticsearch
+17. sudo vi /etc/elasticsearch/jvm.options
+    - :set nu
+    - -Xms4g
+18. sudo systemctl restart elasticsearch
+19. ^restart^status
+20. journalctl -xeu elasticsearch
+21. ss -lnt
+22. sudo firewall-cmd --add-port={9200,9300}/tcp --permanent
+23. firewall-cmd --reload
+24. sudo curl localhost:9200
+25. sudo curl localhost:9200/_cat/nodes?v
+26. sudo systemctl restart elasticsearch 
+27. ^restart^status
+28. sudo yum install kibana-7.8.1
+29. sudo vi /etc/kibana/kibana.yml
+    - :set nu 
+    - Line 7: server.host: "172.16.50.100"
+    - Line 28: Uncomment: 172.16.50.100:9200
+30. :wq
+31. sudo systemctl start kibana
+32. ^start^status
+33. ^status^enable
+34. sudo firewall-cmd --add-port=5601/tcp --permanent
+35. sudo firewall-cmd --reload
+36. ss -lnt
+37. Go to web browser type 172.16.50.100:5601 to see kibana
+38. cd              -need to be in home dir
+38. sudo curl -LO http://172.168.2.20:8080/ecskibana.tar.gz
+39. ll
+40. sudo tar -zxvf ecskibana.tar.gz
+41. ./import-index-templates.sh
+42. Go back to Kibana then Dev Tools
+    - GET _cat/templates?v
+        - ##GET ecs-zeek-*/_mapping##
+        - ##GET ecs-suricata-*/_mapping##
+---  
+__Beats__
+
+- single-purpose lightweight data-shippers
+
+1. sudo yum install filebeat-7.8.1
+2. sudo mv /etc/filebeat/filebeat.yml /etc/filebeat/filebeat.yml.bk
+4. cd /etc/filebeat
+5. ll
+6. sudo curl -LO http://192.168.2.20:8080/filebeat.yml
+7. sudo vi /etc/filebeat/filebeat.yml
+    - :set nu
+    - Line 11: - type: log
+    -            enabled: true
+                 paths:
+                   - /data/fsf/logs/rockout.log
+                 json.keys_under_root: true
+                 fields:
+                   kafka_topic: fsf-raw
+                 fields_under_root: true
+    - Line 22: 172.16.50.100
+8. :wq
+9. sudo systemctl start filebeat
+10. ^start^status
+11. sudo /usr/share/kafka/bin/kafka-topics.sh --bootstrap-server 172.16.50.100:9092 --list 
+12. sudo rm -rf /usr/var/filebeat/registry *not needed*
+13. sudo /usr/share/kafka/bin/kafka-console.sh --bootstrap-server 172.16.50.100:9092 --topic suricata-raw --from-beginning
+    - can change suricata-raw to fsf-raw or zeek-raw
+
+---  
+__Logstash__  
+
+---
+
+1. sudo yum install logstash-7.8.1
+2. cd /etc/logstash/
+3. sudo curl -LO http://192.168.2.20:8080/logstash.tar
+4. ll
+5. sudo tar -xvf logstash.tar
+6. ll
+7. cd conf.d
+8. sudo vi logstash-100-input-kafka-zeek.conf
+    - Line 8: bootstrap_servers => "172.16.50.100:9092"
+9. :wq
+10. sudo vi logstash-100-input-kafka-suricata.conf
+    - Line 8: "172.16.50.100:9092"
+11. :wq
+12. sudo vi logstash-100-input-kafka-fsf.conf
+    - Line 8: "172.16.50.100:9092"
+13. :wq
+14. sudo vi logstash-9999-output-elasticsearch.conf
+    - :set nu
+    - :%s/127.0.0.1/172.16.50.100
+    - Line 2: comment out
+15. :wq
+16. sudo systemctl start logstash
+17. ^start^status
+18. ^status^enable
+19. cat /var/log/logstash
+20. Go to kibana
+21. create index pattern 
+22. name: ecs-suricata-* / ecs-zeek-* / fsf-*
+23. next
+24. @timestamp then create index pattern 
+25. go to discover 
+26. check to see if fields populate
 

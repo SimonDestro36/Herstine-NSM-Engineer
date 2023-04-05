@@ -566,5 +566,64 @@ __Logstash__
 23. next
 24. @timestamp then create index pattern 
 25. go to discover 
-26. check to see if fields populate
+26. check to see if fields populate  
+---
+# DAY 7  
+---  
+
+__Elasticsearch Cluster__
+___Not Testable___  
+
+__Logstash__  
+
+- Server side data processing pipeline 
+- Outputs final results to a variety of destinations
+
+1. sudo systemctl stop logstash
+2. cd /etc/logstash/
+3. ll
+4. sudo vi pipelines.yml
+5. sudo mkdir my-pipeline
+6. sudo chown logstash: my-pipeline/
+7. cd /my-pipeline
+8. sudo vi input.conf
+    - input {
+
+    }
+9. :wq
+10. sudo vi filter.conf
+    - filter {
+
+        mutate {
+
+            copy => { "[messgae]" => "[event][original"] }
+
+        }
+
+
+        json {
+
+            source => "[message]"
+
+            target => "[zeek][http]"
+
+            remove_field => "[message]"
+
+        }
+
+    }
+11. :wq
+12. sudo vi output.conf
+    - output {
+
+        stdout {}
+
+    }
+13. :wq  
+
+---
+# DAY 8  
+---  
+
+__Rebuild Day__
 
